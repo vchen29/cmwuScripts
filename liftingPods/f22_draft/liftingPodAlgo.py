@@ -7,13 +7,17 @@
 #############################################################################
 import random
 from podClass import Person, Pod
+
+# TODO: Refine algo so it takes into account "maybe consistent" folks
 #############################################################################
 # REQUIRED PARAMETERS
-availabilityPath = "cmwuF22_availabilityTable.csv"
-podPeoplePath = "cmwuF22_podPeople.csv"
+availabilityPath = "cmwuS23_availabilityTable.csv"
+podPeoplePath = "cmwuS23_podPeople.csv"
 n = 200
 k = 1000
 groupSize = 3
+skipSim = True
+testCombos = True
 #############################################################################
 # MONTE CARLO ALGORITHM
 def partition(L, n):
@@ -29,19 +33,35 @@ def parsePodPeople(filePath):
     return leaders, nonLeaders
 
 def parseAvailability(filePath):
+    weekdayDict = dict()
     personDict = dict()
     with open(filePath, 'r') as f:
         lines = f.readlines()
-        for line in lines:
-            line = line.strip()
-            line = line.strip(",")
-            line = line.split(",")
-            hour = line[0]
-            for name in line[1:]:
-                name = name.lower()
-                if name not in personDict:
-                    personDict[name] = Person(name)
-                personDict[name].addHour(hour)
+        for i, line in enumerate(lines):
+            line = line.strip().strip(",")
+            if i == 0:
+                line = line.split(",")
+                for idx, elem in enumerate(line):
+                    weekdayDict[idx] = elem
+                    
+            else:
+                line = line.split("/")
+                # print(line)
+                # input()
+                for idx, elem in enumerate(line):
+                    elem = elem.strip().strip('"').strip(",")
+                    # print(repr(elem))
+                    # input()
+                    if idx == 0:
+                        name = elem.lower()
+                    else:
+                        hour = weekdayDict[idx]
+                        times = elem.split(",")
+                        for time in times:
+                            timeDay = f"""{hour}_{time.strip().strip('"')}"""
+                            if name not in personDict:
+                                personDict[name] = Person(name)
+                            personDict[name].addHour(timeDay)     
     return personDict
 
 def getStats(L):
@@ -70,11 +90,9 @@ def simulate(k):
     leaders, nonLeaders = parsePodPeople(podPeoplePath)
     for i in range(len(leaders)):
         leaders[i] = leaders[i].lower()
-    nonLeaders.remove("Mo") # HARDCODED, REMOVE LATER!
     for i in range(len(nonLeaders)):
         nonLeaders[i] = nonLeaders[i].lower()
     personDict = parseAvailability(availabilityPath)
-    del personDict["mo"]  # HARDCODED, REMOVE LATER!
     
     bestGrouping = None
     bestRSS = None
@@ -87,6 +105,7 @@ def simulate(k):
         for (i, group) in enumerate(groups):
             group.append(leaders[i])
         
+        # print(groups)
         # get hours intersection of each group
         podsList = []
         hoursIntersect = []
@@ -111,29 +130,28 @@ def simulate(k):
                 bestRSS = currRSS
                 bestHoursIntersect = hoursIntersect
                 bestPods = podsList
-    
-    return (bestMean, bestRSS, bestGrouping, bestHoursIntersect, bestPods)
+    result = (bestMean, bestRSS, bestGrouping, bestHoursIntersect, bestPods)
+    # print(bestPods)
+    return result
 
-results = None # runSims(n, k)
-processResults = False
 
 def isDesirablePod(mean, rss, hoursIntersect):
-    threeCount = 0
-    if mean < 4:
+    badHrsCount = 0
+    if mean < 11:
         return False
     for num in hoursIntersect:
-        if num < 3:
+        if num < 5:
             return False
-        if num == 3:
-            threeCount += 1
-    return threeCount < 2
+        if num == 5:
+            badHrsCount += 1
+    return badHrsCount == 0    
 
-if processResults:
+if not skipSim:
+    results = runSims(n, k)
     for (bestMean, bestRSS, bestGrouping, bestHoursIntersect, bestPods) in results:
         if isDesirablePod(bestMean, bestRSS, bestHoursIntersect):
             print(bestMean, bestRSS, bestGrouping, bestHoursIntersect)
-
-# print("finished!")
+    print("finished!")
 #############################################################################
 # CODE FOR TESTING PERMUTATIONS
 def printAvailability(d):
@@ -141,7 +159,6 @@ def printAvailability(d):
         print(name, d[name].hours)
 def testCombinations():
     personDict = parseAvailability(availabilityPath)
-    # printAvailability(personDict)
     testPod = Pod()
     textInput = None
     while textInput != "quit":
@@ -151,6 +168,7 @@ def testCombinations():
             continue
         testPod.addPerson(personDict[textInput])
         print(testPod)
-    
-testCombinations()
+
+if testCombos:
+    testCombinations()
 #############################################################################
